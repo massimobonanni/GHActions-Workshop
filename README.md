@@ -26,8 +26,9 @@ dotnet --version
 2. Add a simple Action that builds and tests the console app
 3. Improve the Action to create a GitHub Release (and attach build artifacts)
 4. Create an Action that labels issues based on keywords in the issue text
-5. (Optional) Add quality gates (lint, formatting), caching, and a workflow badge
-6. (Optional) Add environment protection + manual approvals for release
+5. Enable GitHub Models and summarize issues with an Action
+6. (Optional) Add quality gates (lint, formatting), caching, and a workflow badge
+7. (Optional) Add environment protection + manual approvals for release
 
 ---
 
@@ -168,7 +169,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '<dotnetversion>.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore
         run: dotnet restore
@@ -395,13 +396,91 @@ What you learned:
 
 ---
 
-## Step 5 (Optional) — Add polish that helps learners
+## Step 5 — Enable GitHub Models + summarize issues with an Action
 
-### 5.1 Add a workflow badge to the README
+Goal: when someone opens an issue (or edits it), GitHub Actions will call a GitHub Model to generate a short summary and post it as a comment.
+
+### 5.1 Enable GitHub Models for your repo/account
+
+GitHub Models is an AI inference API you can call using GitHub credentials.
+
+Do this to confirm it’s available:
+
+1. Go to https://github.com/marketplace/models and try a model in the playground.
+2. In your repository, check if you have a **Models** tab.
+
+If you don’t see the Models tab:
+- Your organization/enterprise admin may need to enable GitHub Models access for your org, or it may not be available for your plan.
+
+Important for Actions:
+- Workflows that call GitHub Models must grant `models: read` in `permissions:`.
+
+### 5.2 Add a workflow that summarizes issues
+
+Create [.github/workflows/issue-summarizer.yml](.github/workflows/issue-summarizer.yml):
+
+```yaml
+name: Issue summarizer (GitHub Models)
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+    issues: write
+    models: read
+    contents: read
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run AI inference
+        id: inference
+        uses: actions/ai-inference@v1
+        with:
+          prompt: |
+            Summarize the following GitHub issue in one paragraph:
+            Title: ${{ github.event.issue.title }}
+            Body: ${{ github.event.issue.body }}
+
+      - name: Comment with AI summary
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "$RESPONSE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RESPONSE: ${{ steps.inference.outputs.response }}
+```
+
+Commit and push:
+
+```bash
+git add -A
+git commit -m "Add issue summarizer workflow (GitHub Models)"
+git push
+```
+
+Verify:
+- Open or edit an issue
+- The workflow should run
+- A new comment should be added with the summary
+
+What you learned:
+- New permission type: `models: read`
+- Workflows can call AI models securely using `GITHUB_TOKEN`
+- You can combine model output with GitHub API automation (commenting)
+
+---
+
+## Step 6 (Optional) — Add polish that helps learners
+
+### 6.1 Add a workflow badge to the README
 
 In GitHub, open the CI workflow, click “…” → “Create status badge”, then paste it into this README.
 
-### 5.2 Add linting
+### 6.2 Add linting
 
 Add formatting checks (and run them in CI):
 - `dotnet format` (formatting)
@@ -414,7 +493,7 @@ Example step to add to CI:
   run: dotnet format --verify-no-changes
 ```
 
-### 5.3 Use a matrix build
+### 6.3 Use a matrix build
 
 Update CI to test multiple OSes (common for .NET tooling differences):
 
@@ -428,7 +507,7 @@ Then use `runs-on: ${{ matrix.os }}`.
 
 ---
 
-## Step 6 (Optional) — Protect releases
+## Step 7 (Optional) — Protect releases
 
 Teach the concept of environments and approvals:
 - Create an environment named `production`
