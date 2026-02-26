@@ -12,7 +12,7 @@ You will create everything step-by-step so you can see what triggers workflows, 
 - A GitHub account
 - Git installed
 - A code editor (VS Code recommended)
-- .NET SDK 8 installed locally (for the console app)
+- .NET SDK 8 (or later) installed locally (for the console app)
 
 You can verify your install with:
 
